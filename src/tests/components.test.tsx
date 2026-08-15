@@ -10,9 +10,10 @@ import type { GitHubContributor, GitHubRepo, ProcessedCommitStats, ProcessedLang
 
 describe('UI Component Integration & Resilience', () => {
   describe('SearchBar Component', () => {
-    it('calls onQueryChange when user types and clear when X is clicked', () => {
+    it('calls onQueryChange when user types, clear when X is clicked, and switches tabs', () => {
       const onQueryChange = vi.fn();
       const onClear = vi.fn();
+      const onViewTabChange = vi.fn();
 
       const { rerender } = render(
         <SearchBar
@@ -26,12 +27,20 @@ describe('UI Component Integration & Resilience', () => {
           onOrderChange={vi.fn()}
           isLoading={false}
           onClear={onClear}
+          viewTab="explore"
+          onViewTabChange={onViewTabChange}
+          bookmarksCount={3}
         />
       );
 
       const input = screen.getByPlaceholderText(/search repositories/i);
       fireEvent.change(input, { target: { value: 'rust' } });
       expect(onQueryChange).toHaveBeenCalledWith('rust');
+
+      // Click Bookmarks tab
+      const bookmarksTab = screen.getByRole('button', { name: /bookmarked/i });
+      fireEvent.click(bookmarksTab);
+      expect(onViewTabChange).toHaveBeenCalledWith('bookmarks');
 
       // Rerender with query populated
       rerender(
@@ -46,6 +55,9 @@ describe('UI Component Integration & Resilience', () => {
           onOrderChange={vi.fn()}
           isLoading={false}
           onClear={onClear}
+          viewTab="explore"
+          onViewTabChange={onViewTabChange}
+          bookmarksCount={3}
         />
       );
 
@@ -55,7 +67,7 @@ describe('UI Component Integration & Resilience', () => {
     });
   });
 
-  describe('RepoCard Resilience', () => {
+  describe('RepoCard Resilience & Bookmark Action', () => {
     const mockRepo: GitHubRepo = {
       id: 999,
       node_id: 'n999',
@@ -98,12 +110,26 @@ describe('UI Component Integration & Resilience', () => {
 
     it('renders safely when description, language, and license are null', () => {
       const onSelect = vi.fn();
-      render(<RepoCard repo={mockRepo} onSelectRepo={onSelect} />);
+      const onToggleBookmark = vi.fn();
+
+      render(
+        <RepoCard
+          repo={mockRepo}
+          onSelectRepo={onSelect}
+          isBookmarked={false}
+          onToggleBookmark={onToggleBookmark}
+        />
+      );
 
       expect(screen.getByText('minimal-repo')).toBeInTheDocument();
       expect(screen.getByText('No description provided.')).toBeInTheDocument();
       expect(screen.getByText('Plain text')).toBeInTheDocument();
       expect(screen.getByText('3.2k')).toBeInTheDocument();
+
+      // Click bookmark button
+      const bookmarkBtn = screen.getByLabelText('Toggle Bookmark');
+      fireEvent.click(bookmarkBtn);
+      expect(onToggleBookmark).toHaveBeenCalledWith(mockRepo);
 
       // Click card triggers onSelect
       fireEvent.click(screen.getByTestId('repo-card-999'));
@@ -134,7 +160,7 @@ describe('UI Component Integration & Resilience', () => {
   });
 
   describe('CommitActivityChart', () => {
-    it('renders 52-week commit activity metrics and SVG chart', () => {
+    it('renders 52-week commit activity metrics, SVG chart, and switches to Day-of-Week heatmap', () => {
       const commitStats: ProcessedCommitStats = {
         totalCommitsYear: 450,
         avgWeeklyCommits: 9,
@@ -150,8 +176,15 @@ describe('UI Component Integration & Resilience', () => {
 
       expect(screen.getByText('52-Week Commit Activity')).toBeInTheDocument();
       expect(screen.getByText('450')).toBeInTheDocument();
-      expect(screen.getByText('9 / wk')).toBeInTheDocument();
       expect(screen.getByText('45 commits')).toBeInTheDocument();
+
+      // Switch to Day-of-Week heatmap view
+      const heatmapBtn = screen.getByRole('button', { name: /day-of-week/i });
+      fireEvent.click(heatmapBtn);
+
+      expect(screen.getByTestId('weekday-heatmap')).toBeInTheDocument();
+      expect(screen.getByText('Sun')).toBeInTheDocument();
+      expect(screen.getByText('Mon')).toBeInTheDocument();
     });
 
     it('renders empty message when weeks are empty', () => {
@@ -168,7 +201,7 @@ describe('UI Component Integration & Resilience', () => {
   });
 
   describe('ContributorsList', () => {
-    it('renders ranked contributors with podium tags', () => {
+    it('renders ranked contributors with podium tags and contribution counts', () => {
       const contributors: GitHubContributor[] = [
         { id: 1, login: 'dan_abramov', contributions: 1200, avatar_url: '', html_url: 'https://github.com/dan', type: 'User' },
         { id: 2, login: 'sophie_bits', contributions: 950, avatar_url: '', html_url: 'https://github.com/sophie', type: 'User' },

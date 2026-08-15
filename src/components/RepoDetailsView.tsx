@@ -10,6 +10,7 @@ import { getLanguageColor } from '../utils/languageColors';
 import {
   AlertCircle,
   ArrowLeft,
+  Bookmark,
   Calendar,
   Check,
   Clock,
@@ -30,10 +31,19 @@ interface RepoDetailsViewProps {
   repo: GitHubRepo;
   onBack: () => void;
   useMockMode?: boolean;
+  isBookmarked?: boolean;
+  onToggleBookmark?: (repo: GitHubRepo) => void;
 }
 
-export function RepoDetailsView({ repo: initialRepo, onBack, useMockMode = false }: RepoDetailsViewProps): React.JSX.Element {
+export function RepoDetailsView({
+  repo: initialRepo,
+  onBack,
+  useMockMode = false,
+  isBookmarked = false,
+  onToggleBookmark,
+}: RepoDetailsViewProps): React.JSX.Element {
   const [copiedType, setCopiedType] = useState<string | null>(null);
+  const [activeCloneTab, setActiveCloneTab] = useState<'https' | 'ssh' | 'cli'>('https');
 
   const {
     repo: detailedRepo,
@@ -54,10 +64,13 @@ export function RepoDetailsView({ repo: initialRepo, onBack, useMockMode = false
     setTimeout(() => setCopiedType(null), 2000);
   };
 
-  const httpsClone = `https://github.com/${repo.full_name}.git`;
-  const sshClone = `git@github.com:${repo.full_name}.git`;
-  const cliClone = `gh repo clone ${repo.full_name}`;
+  const cloneCommands = {
+    https: `https://github.com/${repo.full_name}.git`,
+    ssh: `git@github.com:${repo.full_name}.git`,
+    cli: `gh repo clone ${repo.full_name}`,
+  };
 
+  const activeCloneValue = cloneCommands[activeCloneTab];
   const langColor = getLanguageColor(repo.language);
 
   return (
@@ -67,13 +80,27 @@ export function RepoDetailsView({ repo: initialRepo, onBack, useMockMode = false
         <button type="button" className="back-btn" onClick={onBack} aria-label="Back to search results">
           <ArrowLeft size={18} />
           <span>Back to results</span>
+          <kbd className="esc-key-badge">Esc</kbd>
         </button>
 
         <div className="nav-actions">
+          {onToggleBookmark && (
+            <button
+              type="button"
+              className={`btn-bookmark-detail ${isBookmarked ? 'bookmark-active' : ''}`}
+              onClick={() => onToggleBookmark(repo)}
+              title={isBookmarked ? 'Remove Bookmark' : 'Save to Bookmarks'}
+            >
+              <Bookmark size={15} className={isBookmarked ? 'fill-current' : ''} />
+              <span>{isBookmarked ? 'Saved' : 'Bookmark'}</span>
+            </button>
+          )}
+
           <button type="button" className="btn-refresh" onClick={refetch} title="Reload repository analytics">
             <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             <span>Sync</span>
           </button>
+
           <a
             href={repo.html_url}
             target="_blank"
@@ -133,51 +160,41 @@ export function RepoDetailsView({ repo: initialRepo, onBack, useMockMode = false
             </div>
           </div>
 
-          {/* Clone Box */}
+          {/* Interactive Clone Switcher Box */}
           <div className="clone-box-container">
-            <div className="clone-box-header">
-              <Terminal size={14} />
-              <span>Clone Repository</span>
+            <div className="clone-box-top">
+              <div className="clone-box-header">
+                <Terminal size={14} />
+                <span>Clone Repo</span>
+              </div>
+              <div className="clone-tab-buttons">
+                {(['https', 'ssh', 'cli'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={`clone-tab-btn ${activeCloneTab === tab ? 'tab-active' : ''}`}
+                    onClick={() => setActiveCloneTab(tab)}
+                  >
+                    {tab.toUpperCase()}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="clone-options">
-              <div className="clone-item">
-                <span className="clone-label">HTTPS</span>
-                <input type="text" readOnly value={httpsClone} className="clone-input" />
-                <button
-                  type="button"
-                  className="btn-copy"
-                  onClick={() => copyToClipboard(httpsClone, 'https')}
-                  title="Copy HTTPS URL"
-                >
-                  {copiedType === 'https' ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-                </button>
-              </div>
 
-              <div className="clone-item">
-                <span className="clone-label">SSH</span>
-                <input type="text" readOnly value={sshClone} className="clone-input" />
-                <button
-                  type="button"
-                  className="btn-copy"
-                  onClick={() => copyToClipboard(sshClone, 'ssh')}
-                  title="Copy SSH clone URL"
-                >
-                  {copiedType === 'ssh' ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-                </button>
-              </div>
-
-              <div className="clone-item">
-                <span className="clone-label">CLI</span>
-                <input type="text" readOnly value={cliClone} className="clone-input" />
-                <button
-                  type="button"
-                  className="btn-copy"
-                  onClick={() => copyToClipboard(cliClone, 'cli')}
-                  title="Copy GitHub CLI command"
-                >
-                  {copiedType === 'cli' ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-                </button>
-              </div>
+            <div className="clone-input-row">
+              <input type="text" readOnly value={activeCloneValue} className="clone-input" />
+              <button
+                type="button"
+                className="btn-copy"
+                onClick={() => copyToClipboard(activeCloneValue, activeCloneTab)}
+                title={`Copy ${activeCloneTab.toUpperCase()} snippet`}
+              >
+                {copiedType === activeCloneTab ? (
+                  <Check size={14} className="text-success" />
+                ) : (
+                  <Copy size={14} />
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -305,7 +322,7 @@ export function RepoDetailsView({ repo: initialRepo, onBack, useMockMode = false
           {/* Visualized Language Breakdown */}
           <LanguageStatsChart languages={languages} totalRepoSize={repo.size * 1024} />
 
-          {/* 52-Week Commit Activity Trend */}
+          {/* 52-Week Commit Activity Trend & Day-of-Week Heatmap */}
           <CommitActivityChart commitStats={commitStats} />
 
           {/* Contributors Leaderboard */}

@@ -12,6 +12,8 @@ interface RepoListProps {
   onSelectRepo: (repo: GitHubRepo) => void;
   query: string;
   language: string;
+  bookmarkedIds?: Set<number>;
+  onToggleBookmark?: (repo: GitHubRepo) => void;
 }
 
 export function RepoList({
@@ -23,6 +25,8 @@ export function RepoList({
   onSelectRepo,
   query,
   language,
+  bookmarkedIds = new Set(),
+  onToggleBookmark,
 }: RepoListProps): React.JSX.Element {
   // Generate smart pagination page numbers
   const getPageNumbers = () => {
@@ -78,7 +82,13 @@ export function RepoList({
       {/* Grid of Repositories */}
       <div className="repo-grid">
         {repos.map((repo) => (
-          <RepoCard key={repo.id} repo={repo} onSelectRepo={onSelectRepo} />
+          <RepoCard
+            key={repo.id}
+            repo={repo}
+            onSelectRepo={onSelectRepo}
+            isBookmarked={bookmarkedIds.has(repo.id)}
+            onToggleBookmark={onToggleBookmark}
+          />
         ))}
       </div>
 

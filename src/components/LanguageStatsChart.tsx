@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { ProcessedLanguage } from '../types/github';
 import { formatBytes } from '../utils/formatters';
-import { Code2, Info } from 'lucide-react';
+import { Code2, Info, Search } from 'lucide-react';
 
 interface LanguageStatsChartProps {
   languages: ProcessedLanguage[];
@@ -10,6 +10,7 @@ interface LanguageStatsChartProps {
 
 export function LanguageStatsChart({ languages }: LanguageStatsChartProps): React.JSX.Element {
   const [activeLang, setActiveLang] = useState<string | null>(null);
+  const [searchFilter, setSearchFilter] = useState<string>('');
 
   if (!languages || languages.length === 0) {
     return (
@@ -30,38 +31,66 @@ export function LanguageStatsChart({ languages }: LanguageStatsChartProps): Reac
 
   const totalBytes = languages.reduce((sum, l) => sum + l.bytes, 0);
 
+  const filteredLanguages = languages.filter((l) =>
+    l.name.toLowerCase().includes(searchFilter.toLowerCase().trim())
+  );
+
   return (
     <div className="language-stats-card" data-testid="language-stats-chart">
       <div className="card-header-row">
         <div className="card-title-group">
           <Code2 size={18} className="text-accent" />
-          <h3 className="card-title">Language Distribution</h3>
+          <div>
+            <h3 className="card-title">Language Distribution</h3>
+            <span className="chart-subtitle">Byte distribution across source code</span>
+          </div>
         </div>
-        <span className="lang-total-badge">{languages.length} {languages.length === 1 ? 'Language' : 'Languages'} ({formatBytes(totalBytes)})</span>
+        <div className="lang-header-meta">
+          <span className="lang-total-badge">
+            {languages.length} {languages.length === 1 ? 'Language' : 'Languages'} ({formatBytes(totalBytes)})
+          </span>
+        </div>
       </div>
 
       {/* Multi-segment proportional visual meter bar */}
       <div className="language-bar-container">
         <div className="language-bar" role="meter" aria-label="Repository language distribution">
-          {languages.map((lang) => (
-            <div
-              key={lang.name}
-              className={`language-bar-segment ${activeLang === lang.name ? 'segment-highlighted' : ''}`}
-              style={{
-                width: `${Math.max(lang.percentage, 1)}%`,
-                backgroundColor: lang.color,
-              }}
-              title={`${lang.name}: ${lang.percentage}% (${formatBytes(lang.bytes)})`}
-              onMouseEnter={() => setActiveLang(lang.name)}
-              onMouseLeave={() => setActiveLang(null)}
-            />
-          ))}
+          {languages.map((lang) => {
+            const isHighlighted = activeLang === lang.name;
+            return (
+              <div
+                key={lang.name}
+                className={`language-bar-segment ${isHighlighted ? 'segment-highlighted' : ''}`}
+                style={{
+                  width: `${Math.max(lang.percentage, 1.2)}%`,
+                  backgroundColor: lang.color,
+                }}
+                title={`${lang.name}: ${lang.percentage}% (${formatBytes(lang.bytes)})`}
+                onMouseEnter={() => setActiveLang(lang.name)}
+                onMouseLeave={() => setActiveLang(null)}
+              />
+            );
+          })}
         </div>
       </div>
 
-      {/* Language Breakdown Cards / Legend */}
+      {/* Filter search if more than 6 languages */}
+      {languages.length > 6 && (
+        <div className="lang-filter-bar">
+          <Search size={14} className="text-muted" />
+          <input
+            type="text"
+            className="lang-search-input"
+            placeholder="Filter languages..."
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+          />
+        </div>
+      )}
+
+      {/* Language Breakdown Grid / Legend */}
       <div className="language-grid">
-        {languages.map((lang) => {
+        {filteredLanguages.map((lang) => {
           const isHighlighted = activeLang === lang.name;
           return (
             <div
@@ -75,7 +104,9 @@ export function LanguageStatsChart({ languages }: LanguageStatsChartProps): Reac
                 <span className="lang-name">{lang.name}</span>
                 <span className="lang-bytes">{formatBytes(lang.bytes)}</span>
               </div>
-              <span className="lang-percentage">{lang.percentage}%</span>
+              <div className="lang-percent-badge" style={{ borderColor: `${lang.color}44` }}>
+                <span className="lang-percentage">{lang.percentage}%</span>
+              </div>
             </div>
           );
         })}
